@@ -72,7 +72,7 @@ function startBot(message) {
                 startBot();
             } else {
                 logger(`Bot stopped after ${global.countRestart} restarts.`, "[ Stopped ]");
-                logger("To see detailed errors, check the logs above or run the bot with 'node RDX.js' directly", "[ Debug ]");
+                logger("To see detailed errors, check the logs above or run the bot with 'node Shaan-Khan-K.js' directly", "[ Debug ]");
             }
         } else {
             logger("Bot process exited with code 0 (normal exit)", "[ Exit ]");
