@@ -3,7 +3,7 @@ const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, rm } =
 const { join, resolve } = require("path");
 const { execSync } = require('child_process');
 const logger = require("./utils/log.js");
-const login = require("iraza2-fca"); 
+const login = require("fca-memo-uzair"); 
 const axios = require("axios");
 const listPackage = JSON.parse(readFileSync('./package.json')).dependencies;
 const listbuiltinModules = require("module").builtinModules;
@@ -21,23 +21,23 @@ global.client = new Object({
   getTime: function (option) {
         switch (option) {
             case "seconds":
-                return `${moment.tz("Asia/Kolkata").format("ss")}`;
+                return `${moment.tz("Asia/Karachi").format("ss")}`;
             case "minutes":
-                return `${moment.tz("Asia/Kolkata").format("mm")}`;
+                return `${moment.tz("Asia/Karachi").format("mm")}`;
             case "hours":
-                return `${moment.tz("Asia/Kolkata").format("HH")}`;
+                return `${moment.tz("Asia/Karachi").format("HH")}`;
             case "date": 
-                return `${moment.tz("Asia/Kolkata").format("DD")}`;
+                return `${moment.tz("Asia/Karachi").format("DD")}`;
             case "month":
-                return `${moment.tz("Asia/Kolkata").format("MM")}`;
+                return `${moment.tz("Asia/Karachi").format("MM")}`;
             case "year":
-                return `${moment.tz("Asia/Kolkata").format("YYYY")}`;
+                return `${moment.tz("Asia/Karachi").format("YYYY")}`;
             case "fullHour":
-                return `${moment.tz("Asia/Kolkata").format("HH:mm:ss")}`;
+                return `${moment.tz("Asia/Karachi").format("HH:mm:ss")}`;
             case "fullYear":
-                return `${moment.tz("Asia/Kolkata").format("DD/MM/YYYY")}`;
+                return `${moment.tz("Asia/Karachi").format("DD/MM/YYYY")}`;
             case "fullTime":
-                return `${moment.tz("Asia/Kolkata").format("HH:mm:ss DD/MM/YYYY")}`;
+                return `${moment.tz("Asia/Karachi").format("HH:mm:ss DD/MM/YYYY")}`;
         }
   }
 });
@@ -144,10 +144,10 @@ function onBot({ models: botModel }) {
         global.config.version = '1.2.14'
         global.client.timeStart = new Date().getTime(),
             function () {
-                const listCommand = readdirSync(global.client.mainPath + '/RDX/commands').filter(command => command.endsWith('.js') && !command.includes('example') && !global.config.commandDisabled.includes(command));
+                const listCommand = readdirSync(global.client.mainPath + '/Priyansh/commands').filter(command => command.endsWith('.js') && !command.includes('example') && !global.config.commandDisabled.includes(command));
                 for (const command of listCommand) {
                     try {
-                        var module = require(global.client.mainPath + '/RDX/commands/' + command);
+                        var module = require(global.client.mainPath + '/Priyansh/commands/' + command);
                         if (!module.config || !module.run || !module.config.commandCategory) throw new Error(global.getText('priyansh', 'errorFormat'));
                         if (global.client.commands.has(module.config.name || '')) throw new Error(global.getText('priyansh', 'nameExist'));
                         if (!module.languages || typeof module.languages != 'object' || Object.keys(module.languages).length == 0) logger.loader(global.getText('priyansh', 'notFoundLanguage', module.config.name), 'warn');
@@ -210,10 +210,10 @@ function onBot({ models: botModel }) {
                 }
             }(),
             function() {
-                const events = readdirSync(global.client.mainPath + '/RDX/events').filter(event => event.endsWith('.js') && !global.config.eventDisabled.includes(event));
+                const events = readdirSync(global.client.mainPath + '/Priyansh/events').filter(event => event.endsWith('.js') && !global.config.eventDisabled.includes(event));
                 for (const ev of events) {
                     try {
-                        var event = require(global.client.mainPath + '/RDX/events/' + ev);
+                        var event = require(global.client.mainPath + '/Priyansh/events/' + ev);
                         if (!event.config || !event.run) throw new Error(global.getText('priyansh', 'errorFormat'));
                         if (global.client.events.has(event.config.name) || '') throw new Error(global.getText('priyansh', 'nameExist'));
                         if (event.config.dependencies && typeof event.config.dependencies == 'object') {
