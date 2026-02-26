@@ -1,39 +1,23 @@
 const axios = require("axios");
 const yts = require("yt-search");
 
-/* ================= CREATOR LOCK ================= */
-const CREATOR_LOCK = (() => {
-  const encoded = "QVJJRi1CQUJV"; // ARIF-BABU (Base64)
-  return Buffer.from(encoded, "base64").toString("utf8");
-})();
-
-// 🔐 Credit Protection
-if (module.exports?.config?.credits && module.exports.config.credits !== CREATOR_LOCK) {
-  console.log("❌ Creator Lock Activated! Credits cannot be changed.");
-  module.exports.run = () => {};
-  return;
-}
-
 /* 🎞 Loading Frames */
 const frames = [
   "🎵 ▰▱▱▱▱▱▱▱▱▱ 10%",
-  "🎶 ▰▰▱▱▱▱▱▱▱▱ 20%",
-  "🎧 ▰▰▰▰▱▱▱▱▱▱ 40%",
-  "💿 ▰▰▰▰▰▰▱▱▱▱ 60%",
+  "🎶 ▰▰▰▰▱▱▱▱▱▱ 40%",
+  "🎧 ▰▰▰▰▰▰▱▱▱▱ 70%",
   "❤️ ▰▰▰▰▰▰▰▰▰▰ 100%"
 ];
 
-/* 🌐 API */
-const baseApiUrl = async () => {
-  const res = await axios.get(
-    "https://raw.githubusercontent.com/Mostakim0978/D1PT0/refs/heads/main/baseApiUrl.json"
-  );
-  return res.data.api;
+/* 🌐 API Setup */
+const getBaseApi = async () => {
+  try {
+    const res = await axios.get("https://raw.githubusercontent.com/Mostakim0978/D1PT0/refs/heads/main/baseApiUrl.json");
+    return res.data.api;
+  } catch (e) {
+    return "https://d-api-24.onrender.com"; // Fallback API
+  }
 };
-
-(async () => {
-  global.apis = { diptoApi: await baseApiUrl() };
-})();
 
 async function getStreamFromURL(url, name) {
   const res = await axios.get(url, { responseType: "stream" });
@@ -41,116 +25,60 @@ async function getStreamFromURL(url, name) {
   return res.data;
 }
 
-/* 🧹 Helpers */
 function cleanTitle(title = "") {
   return title.replace(/[\\/:*?"<>|]/g, "").trim();
-}
-function isYoutubeLink(text = "") {
-  return /youtu\.be|youtube\.com/.test(text);
 }
 
 /* ⚙ CONFIG */
 module.exports.config = {
   name: "music",
-  version: "2.2.0",
-  credits: "ARIF-BABU",
+  version: "2.3.0",
+  credits: "Dipto", 
   hasPermssion: 0,
   cooldowns: 5,
-  description: "YouTube MP3 with full info box",
+  description: "Official YouTube MP3 Downloader",
   commandCategory: "media",
   usages: "song <name | link>"
 };
 
-/* PREFIX MODE ONLY */
 module.exports.run = async function ({ api, args, event }) {
-
   if (!args[0]) {
-    return api.sendMessage(
-      "❌ Song ka naam ya YouTube link do",
-      event.threadID,
-      event.messageID
-    );
+    return api.sendMessage("❌ Song ka naam ya YouTube link dein.", event.threadID, event.messageID);
   }
 
   try {
+    const loading = await api.sendMessage("✅  Apki Request Jari Hai Please wait...", event.threadID);
 
-    const loading = await api.sendMessage(
-      "🔍 Song processing...",
-      event.threadID
-    );
-
+    // Animation Effect
     for (const f of frames) {
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 400));
       await api.editMessage(f, loading.messageID);
     }
 
-    let title = "Unknown Title";
-    let duration = "N/A";
-    let artist = "Unknown";
-    let views = "N/A";
-    let uploaded = "N/A";
-    let videoID;
-
+    const diptoApi = await getBaseApi();
     const input = args.join(" ");
-
-    // 🔥 SAFE SEARCH (name + link)
-    const search = await yts(input);
+    
+    // "official audio" suffix add kiya gaya hai search quality behtar karne ke liye
+    const searchQuery = /youtu\.be|youtube\.com/.test(input) ? input : `${input} official audio`;
+    
+    const search = await yts(searchQuery);
     const video = search.videos && search.videos[0];
 
-    if (video) {
-      videoID = video.videoId;
-      title = cleanTitle(video.title);
-      duration = video.timestamp || "N/A";
-      artist = video.author?.name || "Unknown";
-      views = video.views ? video.views.toLocaleString() : "N/A";
-      uploaded = video.ago || "N/A";
+    if (!video) {
+      return api.sendMessage("⚠️ Koi result nahi mila.", event.threadID, event.messageID);
     }
 
-    // fallback title for links
-    if (isYoutubeLink(input) && title === "Unknown Title") {
-      try {
-        const oembed = await axios.get(
-          `https://www.youtube.com/oembed?url=${input}&format=json`
-        );
-        title = cleanTitle(oembed.data.title);
-        artist = oembed.data.author_name || artist;
-      } catch {}
-    }
+    const { data } = await axios.get(`${diptoApi}/ytDl3?link=${video.videoId}&format=mp3`);
 
-    if (!videoID) throw new Error("Video not found");
+    await api.unsendMessage(loading.messageID);
 
-    const { data } = await axios.get(
-      `${global.apis.diptoApi}/ytDl3?link=${videoID}&format=mp3`
-    );
-
-    api.unsendMessage(loading.messageID);
-
-    return api.sendMessage(
-      {
-        body: `
-🎵 Title: ${title}
-⏱ Duration: ${duration}
-👤 Artist: ${artist}
-👀 Views: ${views}
-📅 Uploaded: ${uploaded}
-
-┗━━━━━━━━━━━━━━━━┛
-        `,
-        attachment: await getStreamFromURL(
-          data.downloadLink,
-          `${title}.mp3`
-        )
-      },
-      event.threadID,
-      event.messageID
-    );
+    return api.sendMessage({
+      body: `🎵 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n⏱ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n👤 𝗔𝗿𝘁𝗶𝘀𝘁: ${video.author.name}\n👀 𝗩𝗶𝗲𝘄𝘀: ${video.views.toLocaleString()}\n📅 𝗨𝗽𝗹𝗼𝗮𝗱𝗲𝗱: ${video.ago}\n\n✅ Official Audio Processed`,
+      attachment: await getStreamFromURL(data.downloadLink, `${cleanTitle(video.title)}.mp3`)
+    }, event.threadID, event.messageID);
 
   } catch (err) {
     console.error(err);
-    return api.sendMessage(
-      "⚠️ Song info fetch nahi ho pa rahi 😢",
-      event.threadID,
-      event.messageID
-    );
+    return api.sendMessage("⚠️ Error: Song download nahi ho saka.", event.threadID, event.messageID);
   }
 };
