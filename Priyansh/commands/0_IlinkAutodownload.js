@@ -4,66 +4,63 @@ const path = require("path");
 
 module.exports = {
   config: {
-    name: "autodl_360p",
-    version: "5.5.0",
+    name: "linkAutoDownload",
+    version: "1.8.0",
     hasPermssion: 0,
     credits: "ISMRST-SHAAN",
-    description: "Auto download All-in-One with 360p Preference & Custom Caption.",
+    description: "Auto download FB, YT (Shorts), IG, TikTok & Pinterest.",
     commandCategory: "Utilities",
-    usages: "Sirf link paste karein",
+    usages: "Link paste karein (YT Shorts/Pinterest added)",
     cooldowns: 5,
+  },
+
+  run: async function ({ api, event, args }) {
+    // Event handler handle karega
   },
 
   handleEvent: async function ({ api, event }) {
     const { body, threadID, messageID } = event;
 
-    if (!body || !body.includes("https://")) return;
+    if (!body || !body.startsWith("https://")) return;
 
-    // Sabhi platforms ke liye regex
-    const dlRegex = /(youtube\.com|youtu\.be|facebook\.com|fb\.watch|instagram\.com|tiktok\.com|twitter\.com|x\.com|threads\.net|pinterest\.com)/ig;
+    // Regex Updates
+    const fbRegex = /(fb\.watch|facebook\.com|fb\.gg)/ig;
+    const igRegex = /(instagram\.com)/ig;
+    const ytRegex = /(youtube\.com|youtu\.be|youtube\.com\/shorts)/ig; // Added Shorts
+    const ttRegex = /(tiktok\.com)/ig;
+    const pinRegex = /(pinterest\.com|pin\.it)/ig; // Added Pinterest
 
-    if (dlRegex.test(body)) {
-      const link = body.match(/\bhttps?:\/\/\S+/gi)[0];
-      
-      // 1. Loading Reaction
+    if (fbRegex.test(body) || igRegex.test(body) || ytRegex.test(body) || ttRegex.test(body) || pinRegex.test(body)) {
+
       api.setMessageReaction("⌛", messageID, () => {}, true);
 
       const cacheDir = path.join(process.cwd(), "cache");
-      if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+      if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+      }
 
-      const cachePath = path.join(cacheDir, `shaan_dl_${Date.now()}.mp4`);
+      const fileName = `shaan_dl_${Date.now()}.mp4`;
+      const cachePath = path.join(cacheDir, fileName);
 
       try {
         const { alldown } = require("arif-babu-downloader");
-        const res = await alldown(link);
+
+        // Alldown API handles most links, but we ensure the URL is clean
+        const res = await alldown(body);
         
-        // 360p ko priority dena, fir high/low check karna
-        const videoUrl = res.data["360p"] || res.data.high || res.data.low || res.data.url;
-        const videoTitle = res.data.title || "Social Media Video";
+        // Pinterest aur YT Shorts ke liye quality priority check
+        const videoUrl = res.data.high || res.data.low || res.data.url;
 
         if (!videoUrl) {
            api.setMessageReaction("❌", messageID, () => {}, true);
            return;
         }
 
-        // Check file size (Messenger limit 25MB-40MB depending on bot)
-        const head = await axios.head(videoUrl);
-        const fileSizeMB = (head.headers['content-length'] || 0) / (1024 * 1024);
-
-        // Caption format jaisa aapne maanga tha
-        const caption = `✨❁ ━━ ━[ 𝐎𝐖𝐍𝐄𝐑 ]━ ━━ ❁✨\n\nᴛɪᴛʟᴇ: ${videoTitle} 💔\n\n✨❁ ━━ ━[ 𝑺𝑯𝑨𝑨𝑵 ]━ ━━ ❁✨`;
-
-        // Agar file 25MB se badi hai toh Direct Link bhejega
-        if (fileSizeMB > 25) {
-          api.setMessageReaction("🔗", messageID, () => {}, true);
-          return api.sendMessage({
-            body: `${caption}\n\n⚠️ Video size bada hai (${fileSizeMB.toFixed(2)}MB), isliye link bhej raha hoon:\n📥 Download: ${videoUrl}`,
-          }, threadID, messageID);
-        }
-
-        // Download and Send
         const response = await axios.get(videoUrl, { responseType: "arraybuffer" });
         fs.writeFileSync(cachePath, Buffer.from(response.data, "binary"));
+
+        const videoTitle = res.data.title || "Downloaded Media";
+        const caption = `✨❁ ━━ ━[ 𝐎𝐖𝐍𝐄𝐑 ]━ ━━ ❁✨\n\nᴛɪᴛʟᴇ: ${videoTitle} 💔\n\n✨❁ ━━ ━[ 𝑺𝑯𝑨𝑨𝑵 ]━ ━━ ❁✨`;
 
         return api.sendMessage({
           body: caption,
