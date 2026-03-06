@@ -16,7 +16,7 @@
     "EMAIL": "",
     "PASSWORD": "",
     "OTPKEY": "",
-    "BOTNAME": "bot",
+    "BOTNAME": "™★𝐒𝐇𝐀𝐀𝐍-𝐁𝐎𝐓🕊️",
     "PREFIX": ".",
     "ADMINBOT": [
         "100016828397863"
@@ -29,7 +29,7 @@
             "storage": "data.sqlite"
         }
     },
-    "APPSTATEPATH": "appstate.json",
+    "APPSTATEPATH": "Appstate.json",
     "FCAOption": {
         "forceLogin": true,
         "listenEvents": true,
