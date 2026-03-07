@@ -6,12 +6,12 @@ const path = require("path");
 module.exports = {
   config: {
     name: "upt",
-    version: "1.0.3",
+    version: "1.0.4",
     hasPermssion: 0,
     credits: "Shaan Khan",
-    description: "No prefix uptime command",
+    description: "No prefix uptime/upt command",
     commandCategory: "system",
-    usages: "Just type 'upt'",
+    usages: "Type 'upt' or 'uptime'",
     cooldowns: 5,
     dependencies: {
       "fs-extra": "",
@@ -20,11 +20,13 @@ module.exports = {
     }
   },
 
-  // Ye part har message ko check karega bina prefix ke
+  // Dono keywords ko detect karne ka logic
   handleEvent: async function ({ api, event, client, __GLOBAL }) {
-    if (event.body && event.body.toLowerCase() === "upt2") {
-      // Direct yahan se run function ko call karenge
-      return this.run({ api, event, client, __GLOBAL });
+    if (event.body) {
+      const message = event.body.toLowerCase().trim();
+      if (message === "upt" || message === "uptime") {
+        return this.run({ api, event, client, __GLOBAL });
+      }
     }
   },
 
@@ -32,7 +34,7 @@ module.exports = {
     const { threadID, messageID } = event;
 
     try {
-      // --- Calculations ---
+      // --- Time & System Calculations ---
       const totalSeconds = process.uptime();
       const days = Math.floor(totalSeconds / (3600 * 24));
       const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
@@ -43,10 +45,7 @@ module.exports = {
       const totalMemoryGB = os.totalmem() / 1024 ** 3;
       const freeMemoryGB = os.freemem() / 1024 ** 3;
       const usedMemoryGB = totalMemoryGB - freeMemoryGB;
-      
-      // Load Average Calculation
-      const load = os.loadavg();
-      const cpuUsage = ((load[0] * 100) / os.cpus().length).toFixed(1);
+      const cpuUsage = (os.loadavg()[0] * 100 / os.cpus().length).toFixed(1);
 
       const timeStart = Date.now();
       const time = new Date().toLocaleTimeString("en-US", {
@@ -55,8 +54,8 @@ module.exports = {
       });
       const date = new Date().toLocaleDateString("en-US");
 
-      // Processing message
-      const infoMsg = await api.sendMessage("⚡ | System analysis in progress...", threadID);
+      // Temp message for effect
+      const infoMsg = await api.sendMessage("⚡ | Fetching system status...", threadID);
       const ping = Date.now() - timeStart;
 
       let pingStatus = ping < 500 ? "✅ | Stable" : "⚠️ | High Latency";
@@ -81,11 +80,11 @@ module.exports = {
 ➤ ⚡ 𝗣𝗜𝗡𝗚: ${ping} ms
 ➤ ⭐ 𝗦𝗧𝗔𝗧𝗨𝗦: ${pingStatus}`;
 
-      // --- Handling Image/GIF ---
+      // --- Media Handling ---
       const cachePath = path.join(__dirname, "cache");
       if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
 
-      const imgPath = path.join(cachePath, `uptime_${Date.now()}.gif`);
+      const imgPath = path.join(cachePath, `upt_${Date.now()}.gif`);
       const imgUrl = "https://i.ibb.co/TqwtBwF2/2c307b069cfd.gif";
 
       const response = await axios.get(imgUrl, { responseType: "arraybuffer" });
@@ -94,8 +93,8 @@ module.exports = {
       return api.sendMessage({
         body: systemInfo,
         attachment: fs.createReadStream(imgPath)
-      }, threadID, (err) => {
-        // Cleaning up
+      }, threadID, () => {
+        // Cleanup after sending
         if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
         api.unsendMessage(infoMsg.messageID);
       }, messageID);
