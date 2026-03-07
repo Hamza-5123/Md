@@ -5,7 +5,7 @@ const { createCanvas, loadImage } = require('canvas');
 
 module.exports.config = {
     name: "pair",
-    version: "3.2.6",
+    version: "3.2.7",
     hasPermssion: 0,
     credits: "Shaan Khan",
     description: "Random pair with fixed canvas positioning",
@@ -43,18 +43,24 @@ module.exports.run = async function({ api, event, Users }) {
         ];
         const randomPoetry = poetryList[Math.floor(Math.random() * poetryList.length)];
 
-        // Fixed URLs: Using Square avatars for better cropping
-        const bgUrl = "https://i.imgur.com/fP8th1j.jpeg"; 
-        const avatarUrl1 = `https://graph.facebook.com/${senderID}/picture?width=512&height=512`;
-        const avatarUrl2 = `https://graph.facebook.com/${randomID}/picture?width=512&height=512`;
+        // FIXED: New Background URL & Better Avatar URLs
+        const bgUrl = "https://i.imgur.com/PnN4B93.jpeg"; 
+        const avatarUrl1 = `https://graph.facebook.com/${senderID}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+        const avatarUrl2 = `https://graph.facebook.com/${randomID}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
 
-        // Helper function with better error handling
         async function getImg(url) {
             try {
-                const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+                // Added headers to mimic a browser to avoid getting blocked (Black Image fix)
+                const res = await axios.get(url, { 
+                    responseType: 'arraybuffer', 
+                    timeout: 15000,
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
                 return await loadImage(Buffer.from(res.data));
             } catch (e) {
-                return await loadImage('https://i.imgur.com/6ve982S.png'); // Fallback image
+                console.log(`Error loading image: ${url}`);
+                // Fallback to a default profile icon if FB fails
+                return await loadImage('https://i.imgur.com/6ve982S.png'); 
             }
         }
 
@@ -64,26 +70,30 @@ module.exports.run = async function({ api, event, Users }) {
             getImg(avatarUrl2)
         ]);
 
-        const canvas = createCanvas(735, 480);
+        // Creating Canvas
+        const canvas = createCanvas(bg.width, bg.height);
         const ctx = canvas.getContext('2d');
         
-        ctx.drawImage(bg, 0, 0, 735, 480);
+        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
 
         const drawAvatar = (img, x, y, radius) => {
             ctx.save();
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, Math.PI * 2, true);
+            ctx.closePath();
             ctx.clip();
             ctx.drawImage(img, x - radius, y - radius, radius * 2, radius * 2);
             ctx.restore();
             
+            // White Border
             ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 5;
+            ctx.lineWidth = 8;
             ctx.stroke();
         };
 
-        drawAvatar(avatar1, 190, 240, 105); 
-        drawAvatar(avatar2, 545, 240, 105); 
+        // Positions adjusted for the new background image
+        drawAvatar(avatar1, 185, 245, 110); 
+        drawAvatar(avatar2, 550, 245, 110); 
 
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(cachePath, canvas.toBuffer());
