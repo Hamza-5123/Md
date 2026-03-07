@@ -60,9 +60,9 @@ module.exports.run = async function({ api, event, Users }) {
             getImg(avatarUrl2).catch(() => loadImage('https://i.imgur.com/6ve982S.png'))
         ]);
 
-        const canvas = createCanvas(740, 470);
+        const canvas = createCanvas(735, 480);
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(bg, 0, 0, 740, 470);
+        ctx.drawImage(bg, 0, 0, 735, 480);
 
         const drawAvatar = (img, x, y, radius) => {
             ctx.save();
