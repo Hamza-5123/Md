@@ -77,8 +77,8 @@ module.exports.run = async function({ api, event, Users }) {
             ctx.restore();
         };
 
-        drawAvatar(avatar1, 215, 228, 115); 
-        drawAvatar(avatar2, 521, 228, 115); 
+        drawAvatar(avatar1, 213, 227, 112); 
+        drawAvatar(avatar2, 519, 227, 112); 
 
         fs.writeFileSync(cachePath, canvas.toBuffer());
 
