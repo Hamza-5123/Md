@@ -92,8 +92,8 @@ module.exports.run = async function({ api, event, Users }) {
         };
 
         // Positions adjusted for the new background image
-        drawAvatar(avatar1, 166, 229, 111); 
-        drawAvatar(avatar2, 559, 229, 111); 
+        drawAvatar(avatar1, 165, 230, 109); 
+        drawAvatar(avatar2, 560, 230, 109); 
 
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(cachePath, canvas.toBuffer());
