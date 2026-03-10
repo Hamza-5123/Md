@@ -1,33 +1,38 @@
 const axios = require("axios");
-const fs = require("fs-extra");
+const fs = require("fs");
 const path = require("path");
 
 module.exports.config = {
   name: "sara",
-  version: "1.2",
+  version: "2.0",
   role: 0,
   credits: "SHAAN-KHAN",
-  description: "Sara AI Voice (Auto-Cache Logic)",
+  description: "Sara AI (Groq API + Voice Logic)",
+  hasPrefix: true,
   usages: "[text]",
   cooldowns: 5,
 };
 
 module.exports.onStart = async function ({ api, event, args }) {
+  const { threadID, messageID, senderID } = event;
   const text = args.join(" ");
-  if (!text) return api.sendMessage("😏 Shaan... mujhse kuch pucho na...", event.threadID);
 
-  api.setMessageReaction("⌛", event.messageID, () => {}, true);
+  if (!text) return api.sendMessage("😏 Shaan... mujhse kuch pucho na...", threadID, messageID);
 
-  // 📂 AUTO CACHE FOLDER CHECK & CREATE
+  // Reaction start
+  api.setMessageReaction("⌛", messageID, () => {}, true);
+
+  // Cache folder configuration
   const cachePath = path.join(__dirname, "cache");
-  fs.ensureDirSync(cachePath); // Agar folder nahi hoga toh ye line bana degi
+  if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
+  const filePath = path.join(cachePath, `sara_${senderID}.mp3`);
 
   try {
-    // 🤖 GROK AI (Logic Same)
-    const ai = await axios.post(
-      "https://api.x.ai/v1/chat/completions",
+    // 🤖 GROQ AI CONNECTION (Fixed URL & Model)
+    const aiResponse = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "grok-beta",
+        model: "llama-3.3-70b-versatile", // High quality model
         messages: [
           {
             role: "system",
@@ -38,39 +43,41 @@ module.exports.onStart = async function ({ api, event, args }) {
       },
       {
         headers: {
-          "Authorization": "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", // <--- Apni key yahan lagao
+          "Authorization": "Bearer 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",
           "Content-Type": "application/json"
         }
       }
     );
 
-    const reply = ai.data.choices[0].message.content;
+    const reply = aiResponse.data.choices[0].message.content;
 
-    // 🔊 VOICE GENERATION (Logic Same)
+    // 🔊 GOOGLE TTS VOICE GENERATION
     const voiceRes = await axios.get(
       `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(reply)}&tl=ur&client=tw-ob`,
       { responseType: "arraybuffer" }
     );
 
-    const filePath = path.join(cachePath, `${event.senderID}.mp3`);
     fs.writeFileSync(filePath, Buffer.from(voiceRes.data));
 
-    api.setMessageReaction("✅", event.messageID, () => {}, true);
+    // Success Reaction
+    api.setMessageReaction("✅", messageID, () => {}, true);
 
-    api.sendMessage(
+    // Send Message with Voice
+    return api.sendMessage(
       {
         body: reply,
         attachment: fs.createReadStream(filePath)
       },
-      event.threadID,
+      threadID,
       () => {
-        // File bhejne ke baad delete karna (Storage bachane ke liye)
+        // Cleaning up cache after sending
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      }
+      },
+      messageID
     );
 
-  } catch (e) {
-    console.error(e);
-    api.sendMessage("❌ AI error ho gaya Shaan...", event.threadID);
+  } catch (error) {
+    console.error("GROQ ERROR:", error.response ? error.response.data : error.message);
+    api.sendMessage("❌ Shaan, Groq API connect nahi ho rahi ya key limit khatam hai.", threadID, messageID);
   }
 };
