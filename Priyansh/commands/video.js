@@ -1,138 +1,125 @@
-const axios = require("axios");
-const yts = require("yt-search");
 
-// 🔒 CREDIT LOCK SYSTEM (DO NOT REMOVE)
-const CREDIT = "Shaan Khan";
-if (module.exports?.config?.credits && module.exports.config.credits !== CREDIT) {
-  throw new Error(
-    "\n❌ CREDIT LOCK ACTIVATED!\nOnly Shaan Khan is allowed to edit this file.\n"
-  );
-}
-// END LOCK 🔒
+const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');
+const yts = require('yt-search');
 
-// 🎞️ Loading Frames
-const frames = [
-  "🎬 ▰▱▱▱▱▱▱▱▱▱ 10%",
-  "📡 ▰▰▱▱▱▱▱▱▱▱ 25%",
-  "⚙️ ▰▰▰▰▱▱▱▱▱▱ 45%",
-  "📦 ▰▰▰▰▰▰▱▱▱▱ 70%",
-  "✅ ▰▰▰▰▰▰▰▰▰▰ 100%"
-];
-
-// 🌐 API Loader
-const baseApiUrl = async () => {
-  const base = await axios.get(
-    "https://raw.githubusercontent.com/Mostakim0978/D1PT0/refs/heads/main/baseApiUrl.json"
-  );
-  return base.data.api;
-};
-
-(async () => {
-  global.apis = {
-    diptoApi: await baseApiUrl()
-  };
-})();
-
-// 🎥 Stream helper
-async function getStreamFromURL(url, pathName) {
-  const response = await axios.get(url, {
-    responseType: "stream",
-    timeout: 60000
-  });
-  response.data.path = pathName;
-  return response.data;
-}
-
-// 🎯 YouTube ID
-function getVideoID(url) {
-  const regex =
-    /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))((\w|-){11})(?:\S+)?$/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
-}
-
-/* ⚙ CONFIG — name LOWERCASE is MUST */
 module.exports.config = {
-  name: "video",
-  version: "2.5.0",
-  credits: "Shaan Khan",
-  hasPermssion: 0,
-  cooldowns: 3,
-  description: "YouTube video download (No prefix needed)",
-  commandCategory: "media",
-  usages: "video <name | link>"
+    name: "video",
+    version: "3.0.0",
+    permission: 0,
+    prefix: true,
+    premium: false,
+    category: "media",
+    credits: "Kashif Raza",
+    description: "Download video from YouTube",
+    commandCategory: "media",
+    usages: ".video [video name]",
+    cooldowns: 5
 };
 
-/* ================= PREFIX-FREE RUN ================= */
-module.exports.run = async function ({ api, args, event }) {
-  try {
-    if (!args[0]) {
-      return api.sendMessage(
-        "❌ Video ka naam ya YouTube link do",
-        event.threadID,
-        event.messageID
-      );
+module.exports.run = async function ({ api, event, args }) {
+    const query = args.join(" ");
+    
+    if (!query) {
+        return api.sendMessage("❌ Please provide a video name", event.threadID, event.messageID);
     }
 
-    const input = args.join(" ");
+    const frames = [
+        "🩵▰▱▱▱▱▱▱▱▱▱ 10%",
+        "💙▰▰▱▱▱▱▱▱▱▱ 25%",
+        "💜▰▰▰▰▱▱▱▱▱▱ 45%",
+        "💖▰▰▰▰▰▰▱▱▱▱ 70%",
+        "💗▰▰▰▰▰▰▰▰▰▰ 100% 😍"
+    ];
 
-    const loading = await api.sendMessage(
-      "🔍 Processing...",
-      event.threadID
-    );
+    const searchMsg = await api.sendMessage(`🔍 Searching...\n\n${frames[0]}`, event.threadID);
 
-    for (const f of frames) {
-      await new Promise(r => setTimeout(r, 400));
-      await api.editMessage(f, loading.messageID);
+    try {
+        // Search using yt-search
+        const searchResults = await yts(query);
+        const videos = searchResults.videos;
+        
+        if (!videos || videos.length === 0) {
+            api.unsendMessage(searchMsg.messageID);
+            return api.sendMessage("❌ No results found", event.threadID, event.messageID);
+        }
+
+        const firstResult = videos[0];
+        const videoUrl = firstResult.url;
+        const title = firstResult.title;
+        const author = firstResult.author.name;
+
+        await api.editMessage(`🎬 Video found!\n\n${frames[1]}`, searchMsg.messageID, event.threadID);
+
+        await api.editMessage(`🎬 Downloading...\n\n${frames[2]}`, searchMsg.messageID, event.threadID);
+
+        // Fetch download URL using new API
+        let fetchRes;
+        try {
+            const apiUrl = `https://api.kraza.qzz.io/download/ytdl?url=${encodeURIComponent(videoUrl)}`;
+            fetchRes = await axios.get(apiUrl, {
+                headers: {
+                    'Accept': 'application/json'
+                },
+                timeout: 60000
+            });
+        } catch (fetchError) {
+            api.unsendMessage(searchMsg.messageID);
+            return api.sendMessage(`❌ Failed to fetch download link: ${fetchError.message}`, event.threadID, event.messageID);
+        }
+
+        if (!fetchRes.data.status || !fetchRes.data.result || !fetchRes.data.result.mp4) {
+            api.unsendMessage(searchMsg.messageID);
+            return api.sendMessage("❌ Failed to get video download URL", event.threadID, event.messageID);
+        }
+
+        const downloadUrl = fetchRes.data.result.mp4;
+
+        await api.editMessage(`🎬 Processing...\n\n${frames[3]}`, searchMsg.messageID, event.threadID);
+
+        // Download the video file
+        let videoRes;
+        try {
+            videoRes = await axios.get(downloadUrl, {
+                responseType: 'arraybuffer',
+                timeout: 180000
+            });
+        } catch (downloadError) {
+            api.unsendMessage(searchMsg.messageID);
+            return api.sendMessage(`❌ Download failed: ${downloadError.message}\n\nPlease try again later.`, event.threadID, event.messageID);
+        }
+
+        const cacheDir = path.join(__dirname, "cache");
+        await fs.ensureDir(cacheDir);
+
+        const videoPath = path.join(cacheDir, `${Date.now()}_video.mp4`);
+        fs.writeFileSync(videoPath, videoRes.data);
+
+        setTimeout(() => {
+            api.editMessage(`🎬 Complete!\n\n${frames[4]}`, searchMsg.messageID, event.threadID);
+        }, 500);
+
+        await api.sendMessage(
+            {
+                body: `🎬 ${title}\n📺 ${author}`,
+                attachment: fs.createReadStream(videoPath)
+            },
+            event.threadID
+        );
+
+        setTimeout(() => {
+            try {
+                if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+                api.unsendMessage(searchMsg.messageID);
+            } catch (err) {
+                console.log("Cleanup error:", err);
+            }
+        }, 10000);
+
+    } catch (error) {
+        console.error("Video command error:", error.message);
+        api.unsendMessage(searchMsg.messageID);
+        return api.sendMessage("❌ An error occurred while processing your request", event.threadID, event.messageID);
     }
-
-    let videoID;
-
-    if (input.includes("youtu")) {
-      videoID = getVideoID(input);
-      if (!videoID) throw new Error("Invalid URL");
-    } else {
-      const res = await yts(input);
-      if (!res.videos.length) throw new Error("No result");
-      videoID = res.videos[0].videoId;
-    }
-
-    const { data } = await axios.get(
-      `${global.apis.diptoApi}/ytDl3?link=${videoID}&format=mp4&quality=360`,
-      { timeout: 30000 }
-    );
-
-    const shortLink = (
-      await axios.get(
-        `https://tinyurl.com/api-create.php?url=${encodeURIComponent(
-          data.downloadLink
-        )}`
-      )
-    ).data;
-
-    api.unsendMessage(loading.messageID);
-
-    return api.sendMessage(
-      {
-        body:
-          `🎬 Title: ${data.title}\n` +
-          `📺 Quality: ${data.quality || "360p"}\n` +
-          `📥 Download: ${shortLink}`,
-        attachment: await getStreamFromURL(
-          data.downloadLink,
-          `${data.title}.mp4`
-        )
-      },
-      event.threadID,
-      event.messageID
-    );
-
-  } catch (err) {
-    console.error(err);
-    return api.sendMessage(
-      "⚠️ Server busy hai ya API slow hai 😢",
-      event.threadID,
-      event.messageID
-    );
-  }
 };
