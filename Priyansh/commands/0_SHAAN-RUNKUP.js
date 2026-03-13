@@ -1,8 +1,3 @@
-/**
- * Rankup Command for Mirai
- * Purified & Optimized version
- */
-
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs-extra');
 const axios = require('axios');
@@ -10,102 +5,89 @@ const path = require('path');
 
 module.exports.config = {
   name: "rankup",
-  version: "1.0.1",
+  version: "1.0.2",
   hasPermssion: 0,
   credits: "𝐏𝐫𝐢𝐲𝐚𝐧𝐬𝐡 𝐑𝐚𝐣𝐩𝐮𝐭",
-  description: "Level up hone par notification automatically bhejta hai",
-  commandCategory: "Economy",
-  usages: "Automatic",
-  cooldowns: 2,
+  description: "Automated Rankup Notification",
+  commandCategory: "system",
+  usages: "",
+  cooldowns: 0,
 };
 
 module.exports.handleEvent = async function({ api, event, Currencies, Users }) {
-  const { threadID, senderID } = event;
-  if (!senderID || !threadID) return;
+  const { threadID, senderID, body } = event;
+  if (!senderID || !threadID || senderID == api.getCurrentUserID()) return;
 
-  // Mirai Default Level Calculation logic
-  const userData = (await Currencies.getData(senderID)) || {};
-  const exp = userData.exp || 0;
-  const currentLevel = Math.floor(Math.sqrt(1 + (4 * exp / 1000)) / 2);
+  try {
+    // 1. Data Get Karo
+    let userData = await Currencies.getData(senderID);
+    let exp = userData.exp || 0;
+    
+    // 2. Simple Level Formula (Har 500 XP par level up)
+    let currentLevel = Math.floor(exp / 500);
 
-  // Global tracker to prevent spam and detect actual level up
-  if (!global.rankUpTracker) global.rankUpTracker = new Map();
-  const oldLevel = global.rankUpTracker.get(senderID);
+    // 3. Level Tracker Check
+    if (typeof global.rankUpTracker === "undefined") global.rankUpTracker = new Map();
+    
+    let oldLevel = global.rankUpTracker.get(senderID);
 
-  // Sirf tab trigger hoga jab level sach mein badhega
-  if (oldLevel !== undefined && currentLevel > oldLevel) {
-    try {
+    // Agar level badha hai (Peheli baar check hone par notification nahi jayega)
+    if (oldLevel !== undefined && currentLevel > oldLevel) {
       const name = (await Users.getData(senderID)).name || "User";
       
-      // Random Theme Selection
-      const themes = [
-        { bg: '#0f0c29', accent: '#00f2ff' },
-        { bg: '#200122', accent: '#ff9966' },
-        { bg: '#000000', accent: '#00ff99' }
-      ];
-      const theme = themes[Math.floor(Math.random() * themes.length)];
-
-      // --- Canvas Generation ---
-      const canvas = createCanvas(1200, 400);
+      // Canvas Drawing
+      const canvas = createCanvas(800, 250);
       const ctx = canvas.getContext('2d');
 
-      // Background
-      ctx.fillStyle = theme.bg;
-      ctx.fillRect(0, 0, 1200, 400);
+      // Simple Clean Background
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(0, 0, 800, 250);
+      ctx.strokeStyle = "#00ff99";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(10, 10, 780, 230);
 
-      // Avatar Logic
+      // Avatar
       const avatarUrl = `https://graph.facebook.com/${senderID}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
       const avatarBuffer = (await axios.get(avatarUrl, { responseType: 'arraybuffer' })).data;
       const avatar = await loadImage(avatarBuffer);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(215, 200, 115, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(avatar, 100, 85, 230, 230);
-      ctx.restore();
-
-      // Border
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = 10;
-      ctx.stroke();
+      ctx.drawImage(avatar, 50, 50, 150, 150);
 
       // Text
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 70px sans-serif";
-      ctx.fillText("LEVEL UP!", 400, 150);
+      ctx.font = "bold 45px Arial";
+      ctx.fillText("LEVEL UP!", 250, 100);
       
-      ctx.fillStyle = theme.accent;
-      ctx.font = "bold 50px sans-serif";
-      ctx.fillText(name.slice(0, 15), 400, 230);
-
+      ctx.fillStyle = "#00ff99";
+      ctx.font = "35px Arial";
+      ctx.fillText(name, 250, 160);
+      
       ctx.fillStyle = "#ffffff";
-      ctx.font = "40px sans-serif";
-      ctx.fillText(`You've reached Level ${currentLevel}`, 400, 310);
+      ctx.font = "30px Arial";
+      ctx.fillText(`Reached Level: ${currentLevel}`, 250, 210);
 
-      const pathImg = path.join(__dirname, `rank_${senderID}.png`);
-      fs.writeFileSync(pathImg, canvas.toBuffer());
+      const imgPath = path.join(__dirname, `rankup_${senderID}.png`);
+      fs.writeFileSync(imgPath, canvas.toBuffer());
 
-      // Send Message & Bonus
-      const bonus = currentLevel * 100;
-      await Currencies.increaseMoney(senderID, bonus);
-
+      // Send & Reward
+      await Currencies.increaseMoney(senderID, 500); // 500 coins bonus
+      
       api.sendMessage({
-        body: `🎉 Congratulations ${name}!\nLevel Up: ${currentLevel}\nBonus: +${bonus} coins`,
-        attachment: fs.createReadStream(pathImg),
+        body: `🎊 Badhai ho ${name}!\nAapka level badh kar ${currentLevel} ho gaya hai.\nBonus: 500 coins mil gaye!`,
+        attachment: fs.createReadStream(imgPath),
         mentions: [{ tag: name, id: senderID }]
-      }, threadID, () => fs.unlinkSync(pathImg));
-
-    } catch (e) {
-      console.error("Rankup Error:", e);
+      }, threadID, () => {
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      });
     }
-  }
 
-  // Update Tracker
-  global.rankUpTracker.set(senderID, currentLevel);
+    // Har message par tracker update karo
+    global.rankUpTracker.set(senderID, currentLevel);
+
+  } catch (err) {
+    // console.log(err); // Error check karne ke liye ise uncomment karein
+  }
 };
 
 module.exports.run = async function({ api, event }) {
-  // Empty run because it works on events
-  return api.sendMessage("Rankup notification is active!", event.threadID);
+    return api.sendMessage("Rankup notification system ON hai ✅", event.threadID);
 };
