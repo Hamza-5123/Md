@@ -5,10 +5,10 @@ const ytSearch = require("yt-search");
 
 module.exports.config = {
     name: "song",
-    version: "1.2.0",
+    version: "1.4.0",
     hasPermssion: 0,
-    credits: "Priyansh / Gemini",
-    description: "Download music from YouTube",
+    credits: "Shaan Khan",
+    description: "Download music from YouTube with optimized streaming",
     commandCategory: "Media",
     usages: "[song name/URL]",
     cooldowns: 5
@@ -25,14 +25,18 @@ module.exports.run = async function ({ api, event, args }) {
     }
 
     const input = args.join(" ");
-    const cachePath = path.join(__dirname, "cache", `${Date.now()}.mp3`);
-    if (!fs.existsSync(path.join(__dirname, "cache"))) fs.mkdirSync(path.join(__dirname, "cache"), { recursive: true });
+    const cacheDir = path.join(__dirname, "cache");
+    const fileName = `${Date.now()}.mp3`;
+    const cachePath = path.join(cacheDir, fileName);
+    
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
-    let searchingMsg;
+    let processingMsg;
     try {
-        searchingMsg = await api.sendMessage(`🔍 Searching for "${input}"...`, threadID);
+        // Direct Status Message
+        processingMsg = await api.sendMessage("✅ Apki Request Jari Hai Please Wait...", threadID);
 
-        // 1. YouTube Search
+        // 1. YouTube Search (Top result only)
         const searchResult = await ytSearch(input);
         if (!searchResult || !searchResult.videos.length) {
             return api.sendMessage("❌ Song not found.", threadID, messageID);
@@ -40,46 +44,67 @@ module.exports.run = async function ({ api, event, args }) {
         const video = searchResult.videos[0];
         const videoUrl = video.url;
 
-        // 2. Calling API (Updated to GET or Correct POST)
-        // Note: Agar 400 aa raha hai, toh parameters check karein. 
-        // Kuch APIs ko 'url' chahiye hota hai 'link' ki jagah.
+        // 2. Calling API for Download Link
         const apiUrl = `https://priyanshuapi.xyz/api/runner/youtube-downloader-v2/download`;
-        
         const response = await axios.post(apiUrl, {
-            url: videoUrl, // 'link' ko 'url' karke dekhein agar error barkarar rahe
-            link: videoUrl,
+            url: videoUrl,
             format: "mp3",
             quality: "320"
         }, {
             headers: {
                 'Authorization': `Bearer ${PRIYANSHU_API_KEY}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            timeout: 30000 // 30 seconds timeout for API response
         });
 
         const data = response.data.data;
         if (!data || !data.downloadUrl) {
-            throw new Error("Download link not found in API response.");
+            throw new Error("Download link not found.");
         }
 
-        // 3. Download File
-        const writer = fs.createWriteStream(cachePath);
-        const stream = await axios.get(data.downloadUrl, { responseType: "stream" });
-        stream.data.pipe(writer);
+        // 3. Pehle Title details bhejna (No reply, just message)
+        const infoMsg = `🎵 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n⏱️ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n👤 𝗔𝗿𝘁𝗶𝘀𝘁: ${video.author.name}`;
+        await api.sendMessage(infoMsg, threadID);
 
-        writer.on("finish", () => {
+        // 4. File Stream Download (For handling large files)
+        const writer = fs.createWriteStream(cachePath);
+        const streamResponse = await axios({
+            url: data.downloadUrl,
+            method: 'GET',
+            responseType: 'stream'
+        });
+
+        // Pipe the stream to handle large data without memory spikes
+        streamResponse.data.pipe(writer);
+
+        writer.on("finish", async () => {
+            // Check file size (FB limits apply, usually 25MB - 50MB for bots)
+            const stats = fs.statSync(cachePath);
+            const fileSizeInMB = stats.size / (1024 * 1024);
+
+            if (fileSizeInMB > 45) { // Messenger safe limit
+                api.sendMessage("⚠️ File is too large to send on Messenger (Max 45MB).", threadID, messageID);
+                return fs.unlinkSync(cachePath);
+            }
+
+            // Send file as attachment
             api.sendMessage({
-                body: `🎵 Title: ${video.title}\n⏱️ Duration: ${video.timestamp}\n👤 Artist: ${video.author.name}`,
                 attachment: fs.createReadStream(cachePath)
-            }, threadID, () => {
-                fs.unlinkSync(cachePath);
-                if (searchingMsg) api.unsendMessage(searchingMsg.messageID);
-            }, messageID);
+            }, threadID, (err) => {
+                if (err) console.error("Send Error:", err);
+                if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+                if (processingMsg) api.unsendMessage(processingMsg.messageID);
+            });
+        });
+
+        writer.on("error", (err) => {
+            throw err;
         });
 
     } catch (error) {
         console.error(error);
-        if (searchingMsg) api.unsendMessage(searchingMsg.messageID);
-        api.sendMessage(`❌ Error: ${error.response?.data?.message || error.message}\nCheck if your API Key is active.`, threadID, messageID);
+        if (processingMsg) api.unsendMessage(processingMsg.messageID);
+        api.sendMessage(`❌ Failed: ${error.message}`, threadID, messageID);
     }
 };
