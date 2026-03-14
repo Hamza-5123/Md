@@ -5,10 +5,10 @@ const ytSearch = require("yt-search");
 
 module.exports.config = {
     name: "song",
-    version: "1.4.0",
+    version: "1.5.0",
     hasPermssion: 0,
     credits: "Shaan Khan",
-    description: "Download music from YouTube with optimized streaming",
+    description: "Download music with custom formatting and large file support",
     commandCategory: "Media",
     usages: "[song name/URL]",
     cooldowns: 5
@@ -36,7 +36,7 @@ module.exports.run = async function ({ api, event, args }) {
         // Direct Status Message
         processingMsg = await api.sendMessage("✅ Apki Request Jari Hai Please Wait...", threadID);
 
-        // 1. YouTube Search (Top result only)
+        // 1. YouTube Search
         const searchResult = await ytSearch(input);
         if (!searchResult || !searchResult.videos.length) {
             return api.sendMessage("❌ Song not found.", threadID, messageID);
@@ -55,7 +55,7 @@ module.exports.run = async function ({ api, event, args }) {
                 'Authorization': `Bearer ${PRIYANSHU_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            timeout: 30000 // 30 seconds timeout for API response
+            timeout: 60000 // 60 seconds for larger searches
         });
 
         const data = response.data.data;
@@ -63,11 +63,13 @@ module.exports.run = async function ({ api, event, args }) {
             throw new Error("Download link not found.");
         }
 
-        // 3. Pehle Title details bhejna (No reply, just message)
-        const infoMsg = `🎵 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n⏱️ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n👤 𝗔𝗿𝘁𝗶𝘀𝘁: ${video.author.name}`;
+        // 3. Formatting Message (Title, Duration, Artist with Gaps)
+        // Yahan spacing aur aapka custom text add kiya gaya hai
+        const infoMsg = `🖤 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n\n⏱️ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n\n👤 𝗔𝗿𝘁𝗶𝘀𝘁: ${video.author.name}\n\n»»𝑶𝑾𝑵𝑬𝑹««★™ »»𝑺𝑯𝑨𝑨𝑵 𝑲𝑯𝑨𝑵««\n🥀𝒀𝑬 𝑳𝑶 𝑩𝑨𝑩𝒀 𝑨𝑷𝑲𝑰     👉SONG`;
+        
         await api.sendMessage(infoMsg, threadID);
 
-        // 4. File Stream Download (For handling large files)
+        // 4. Optimized Stream Download
         const writer = fs.createWriteStream(cachePath);
         const streamResponse = await axios({
             url: data.downloadUrl,
@@ -75,25 +77,24 @@ module.exports.run = async function ({ api, event, args }) {
             responseType: 'stream'
         });
 
-        // Pipe the stream to handle large data without memory spikes
         streamResponse.data.pipe(writer);
 
         writer.on("finish", async () => {
-            // Check file size (FB limits apply, usually 25MB - 50MB for bots)
             const stats = fs.statSync(cachePath);
             const fileSizeInMB = stats.size / (1024 * 1024);
 
-            if (fileSizeInMB > 45) { // Messenger safe limit
-                api.sendMessage("⚠️ File is too large to send on Messenger (Max 45MB).", threadID, messageID);
+            // Large file check (Messenger limit 45-48MB)
+            if (fileSizeInMB > 48) {
+                api.sendMessage(`⚠️ Song size (${fileSizeInMB.toFixed(2)}MB) is too large for Messenger.`, threadID, messageID);
                 return fs.unlinkSync(cachePath);
             }
 
-            // Send file as attachment
+            // Send Audio File
             api.sendMessage({
                 attachment: fs.createReadStream(cachePath)
-            }, threadID, (err) => {
-                if (err) console.error("Send Error:", err);
+            }, threadID, () => {
                 if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+                // Status message delete karna optional hai, par clear chat ke liye better hai
                 if (processingMsg) api.unsendMessage(processingMsg.messageID);
             });
         });
