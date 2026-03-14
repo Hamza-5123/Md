@@ -1,125 +1,119 @@
-
-const axios = require('axios');
-const fs = require('fs-extra');
-const path = require('path');
-const yts = require('yt-search');
+const fs = require("fs-extra");
+const path = require("path");
+const axios = require("axios");
+const ytSearch = require("yt-search");
 
 module.exports.config = {
     name: "video",
-    version: "3.0.0",
-    permission: 0,
-    prefix: true,
-    premium: false,
-    category: "media",
-    credits: "Kashif Raza",
-    description: "Download video from YouTube",
-    commandCategory: "media",
-    usages: ".video [video name]",
-    cooldowns: 5
+    aliases: ["ytvideo"],
+    version: "1.7.0",
+    credits: "Priyansh / Gemini",
+    hasPermssion: 0,
+    commandCategory: "Media",
+    description: "Download video from YouTube with reactions and optimized formatting",
+    usages: "[video name/URL]",
+    cooldowns: 5,
 };
 
 module.exports.run = async function ({ api, event, args }) {
-    const query = args.join(" ");
-    
-    if (!query) {
-        return api.sendMessage("❌ Please provide a video name", event.threadID, event.messageID);
+    const { threadID, messageID } = event;
+
+    // 🔑 API KEY (Priyanshu API)
+    const PRIYANSHU_API_KEY = "apim_xvY6cZuyLPTyju7BBJJOxynlf8Hp5tR19sXJIdEUZIA"; 
+
+    if (!args.length) {
+        return api.sendMessage("❌ Please enter a video name or YouTube URL.", threadID, messageID);
     }
 
-    const frames = [
-        "🩵▰▱▱▱▱▱▱▱▱▱ 10%",
-        "💙▰▰▱▱▱▱▱▱▱▱ 25%",
-        "💜▰▰▰▰▱▱▱▱▱▱ 45%",
-        "💖▰▰▰▰▰▰▱▱▱▱ 70%",
-        "💗▰▰▰▰▰▰▰▰▰▰ 100% 😍"
-    ];
+    const input = args.join(" ");
+    const cacheDir = path.join(__dirname, "cache");
+    const fileName = `${Date.now()}.mp4`;
+    const cachePath = path.join(cacheDir, fileName);
+    
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
-    const searchMsg = await api.sendMessage(`🔍 Searching...\n\n${frames[0]}`, event.threadID);
-
+    let processingMsg;
     try {
-        // Search using yt-search
-        const searchResults = await yts(query);
-        const videos = searchResults.videos;
-        
-        if (!videos || videos.length === 0) {
-            api.unsendMessage(searchMsg.messageID);
-            return api.sendMessage("❌ No results found", event.threadID, event.messageID);
+        // 1. Initial Reaction (Loading)
+        api.setMessageReaction("⌛", messageID, (err) => {}, true);
+
+        // Status Message
+        processingMsg = await api.sendMessage("✅ Apki Request Jari Hai Please Wait...", threadID);
+
+        // 2. YouTube Search
+        const searchResult = await ytSearch(input);
+        if (!searchResult || !searchResult.videos.length) {
+            api.setMessageReaction("❌", messageID, (err) => {}, true);
+            if (processingMsg) api.unsendMessage(processingMsg.messageID);
+            return api.sendMessage("❌ Video not found.", threadID, messageID);
         }
+        const video = searchResult.videos[0];
+        const videoUrl = video.url;
 
-        const firstResult = videos[0];
-        const videoUrl = firstResult.url;
-        const title = firstResult.title;
-        const author = firstResult.author.name;
-
-        await api.editMessage(`🎬 Video found!\n\n${frames[1]}`, searchMsg.messageID, event.threadID);
-
-        await api.editMessage(`🎬 Downloading...\n\n${frames[2]}`, searchMsg.messageID, event.threadID);
-
-        // Fetch download URL using new API
-        let fetchRes;
-        try {
-            const apiUrl = `https://api.kraza.qzz.io/download/ytdl?url=${encodeURIComponent(videoUrl)}`;
-            fetchRes = await axios.get(apiUrl, {
-                headers: {
-                    'Accept': 'application/json'
-                },
-                timeout: 60000
-            });
-        } catch (fetchError) {
-            api.unsendMessage(searchMsg.messageID);
-            return api.sendMessage(`❌ Failed to fetch download link: ${fetchError.message}`, event.threadID, event.messageID);
-        }
-
-        if (!fetchRes.data.status || !fetchRes.data.result || !fetchRes.data.result.mp4) {
-            api.unsendMessage(searchMsg.messageID);
-            return api.sendMessage("❌ Failed to get video download URL", event.threadID, event.messageID);
-        }
-
-        const downloadUrl = fetchRes.data.result.mp4;
-
-        await api.editMessage(`🎬 Processing...\n\n${frames[3]}`, searchMsg.messageID, event.threadID);
-
-        // Download the video file
-        let videoRes;
-        try {
-            videoRes = await axios.get(downloadUrl, {
-                responseType: 'arraybuffer',
-                timeout: 180000
-            });
-        } catch (downloadError) {
-            api.unsendMessage(searchMsg.messageID);
-            return api.sendMessage(`❌ Download failed: ${downloadError.message}\n\nPlease try again later.`, event.threadID, event.messageID);
-        }
-
-        const cacheDir = path.join(__dirname, "cache");
-        await fs.ensureDir(cacheDir);
-
-        const videoPath = path.join(cacheDir, `${Date.now()}_video.mp4`);
-        fs.writeFileSync(videoPath, videoRes.data);
-
-        setTimeout(() => {
-            api.editMessage(`🎬 Complete!\n\n${frames[4]}`, searchMsg.messageID, event.threadID);
-        }, 500);
-
-        await api.sendMessage(
-            {
-                body: `🎬 ${title}\n📺 ${author}`,
-                attachment: fs.createReadStream(videoPath)
+        // 3. Calling API for Video Download Link
+        const apiUrl = `https://priyanshuapi.xyz/api/runner/youtube-downloader-v2/download`;
+        const response = await axios.post(apiUrl, {
+            url: videoUrl,
+            format: "mp4",
+            videoQuality: "360" // Standard quality for FB
+        }, {
+            headers: {
+                'Authorization': `Bearer ${PRIYANSHU_API_KEY}`,
+                'Content-Type': 'application/json'
             },
-            event.threadID
-        );
+            timeout: 60000
+        });
 
-        setTimeout(() => {
-            try {
-                if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-                api.unsendMessage(searchMsg.messageID);
-            } catch (err) {
-                console.log("Cleanup error:", err);
+        const data = response.data.data;
+        if (!data || !data.downloadUrl) {
+            throw new Error("Download link not found.");
+        }
+
+        // 4. Formatting Message (Title/Details with Gaps + Your Footer)
+        const infoMsg = `🎥 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n\n⏱️ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n\n👤 𝗖𝗵𝗮𝗻𝗻𝗲𝗹: ${video.author.name}\n\n»»𝑶𝑾𝑵𝑬𝑹««★™ »»𝑺𝑯𝑨𝑨𝑵 𝑲𝑯𝑨𝑵««\n🥀𝒀𝑬 𝑳𝑶 𝑩𝑨𝑩𝒀 𝑨𝑷𝑲𝑰     👉VIDEO`;
+        
+        await api.sendMessage(infoMsg, threadID);
+
+        // 5. Stream Download for Large Videos
+        const writer = fs.createWriteStream(cachePath);
+        const streamResponse = await axios({
+            url: data.downloadUrl,
+            method: 'GET',
+            responseType: 'stream'
+        });
+
+        streamResponse.data.pipe(writer);
+
+        writer.on("finish", async () => {
+            const stats = fs.statSync(cachePath);
+            const fileSizeInMB = stats.size / (1024 * 1024);
+
+            // Messenger limit for video is usually 25MB-40MB depending on bot account
+            if (fileSizeInMB > 45) {
+                api.setMessageReaction("❌", messageID, (err) => {}, true);
+                api.sendMessage(`⚠️ Video size (${fileSizeInMB.toFixed(2)}MB) is too large for Messenger.`, threadID, messageID);
+                return fs.unlinkSync(cachePath);
             }
-        }, 10000);
+
+            // Send Video File
+            api.sendMessage({
+                attachment: fs.createReadStream(cachePath)
+            }, threadID, (err) => {
+                if (!err) {
+                    // Final Reaction (Done)
+                    api.setMessageReaction("✅", messageID, (err) => {}, true);
+                }
+                if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+                if (processingMsg) api.unsendMessage(processingMsg.messageID);
+            });
+        });
+
+        writer.on("error", (err) => { throw err; });
 
     } catch (error) {
-        console.error("Video command error:", error.message);
-        api.unsendMessage(searchMsg.messageID);
-        return api.sendMessage("❌ An error occurred while processing your request", event.threadID, event.messageID);
+        console.error(error);
+        api.setMessageReaction("❌", messageID, (err) => {}, true);
+        if (processingMsg) api.unsendMessage(processingMsg.messageID);
+        api.sendMessage(`❌ Failed: ${error.message}`, threadID, messageID);
     }
 };
