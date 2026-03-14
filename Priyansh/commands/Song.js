@@ -5,10 +5,10 @@ const ytSearch = require("yt-search");
 
 module.exports.config = {
     name: "song",
-    version: "1.5.0",
+    version: "1.6.0",
     hasPermssion: 0,
     credits: "Shaan Khan",
-    description: "Download music with custom formatting and large file support",
+    description: "Download music with reactions and custom formatting",
     commandCategory: "Media",
     usages: "[song name/URL]",
     cooldowns: 5
@@ -33,18 +33,22 @@ module.exports.run = async function ({ api, event, args }) {
 
     let processingMsg;
     try {
-        // Direct Status Message
+        // 1. Initial Reaction (Loading)
+        api.setMessageReaction("⌛", messageID, (err) => {}, true);
+
+        // Status Message
         processingMsg = await api.sendMessage("✅ Apki Request Jari Hai Please Wait...", threadID);
 
-        // 1. YouTube Search
+        // 2. YouTube Search
         const searchResult = await ytSearch(input);
         if (!searchResult || !searchResult.videos.length) {
+            api.setMessageReaction("❌", messageID, (err) => {}, true);
             return api.sendMessage("❌ Song not found.", threadID, messageID);
         }
         const video = searchResult.videos[0];
         const videoUrl = video.url;
 
-        // 2. Calling API for Download Link
+        // 3. Calling API
         const apiUrl = `https://priyanshuapi.xyz/api/runner/youtube-downloader-v2/download`;
         const response = await axios.post(apiUrl, {
             url: videoUrl,
@@ -55,7 +59,7 @@ module.exports.run = async function ({ api, event, args }) {
                 'Authorization': `Bearer ${PRIYANSHU_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            timeout: 60000 // 60 seconds for larger searches
+            timeout: 60000
         });
 
         const data = response.data.data;
@@ -63,13 +67,12 @@ module.exports.run = async function ({ api, event, args }) {
             throw new Error("Download link not found.");
         }
 
-        // 3. Formatting Message (Title, Duration, Artist with Gaps)
-        // Yahan spacing aur aapka custom text add kiya gaya hai
+        // 4. Formatting Message (Title/Artist with Gap + Your Footer)
         const infoMsg = `🖤 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n\n⏱️ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n\n👤 𝗔𝗿𝘁𝗶𝘀𝘁: ${video.author.name}\n\n»»𝑶𝑾𝑵𝑬𝑹««★™ »»𝑺𝑯𝑨𝑨𝑵 𝑲𝑯𝑨𝑵««\n🥀𝒀𝑬 𝑳𝑶 𝑩𝑨𝑩𝒀 𝑨𝑷𝑲𝑰     👉SONG`;
         
         await api.sendMessage(infoMsg, threadID);
 
-        // 4. Optimized Stream Download
+        // 5. Optimized Download
         const writer = fs.createWriteStream(cachePath);
         const streamResponse = await axios({
             url: data.downloadUrl,
@@ -83,9 +86,9 @@ module.exports.run = async function ({ api, event, args }) {
             const stats = fs.statSync(cachePath);
             const fileSizeInMB = stats.size / (1024 * 1024);
 
-            // Large file check (Messenger limit 45-48MB)
             if (fileSizeInMB > 48) {
-                api.sendMessage(`⚠️ Song size (${fileSizeInMB.toFixed(2)}MB) is too large for Messenger.`, threadID, messageID);
+                api.setMessageReaction("❌", messageID, (err) => {}, true);
+                api.sendMessage(`⚠️ Song size (${fileSizeInMB.toFixed(2)}MB) is too large.`, threadID, messageID);
                 return fs.unlinkSync(cachePath);
             }
 
@@ -93,18 +96,19 @@ module.exports.run = async function ({ api, event, args }) {
             api.sendMessage({
                 attachment: fs.createReadStream(cachePath)
             }, threadID, () => {
+                // Final Reaction (Done)
+                api.setMessageReaction("✅", messageID, (err) => {}, true);
+                
                 if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
-                // Status message delete karna optional hai, par clear chat ke liye better hai
                 if (processingMsg) api.unsendMessage(processingMsg.messageID);
             });
         });
 
-        writer.on("error", (err) => {
-            throw err;
-        });
+        writer.on("error", (err) => { throw err; });
 
     } catch (error) {
         console.error(error);
+        api.setMessageReaction("❌", messageID, (err) => {}, true);
         if (processingMsg) api.unsendMessage(processingMsg.messageID);
         api.sendMessage(`❌ Failed: ${error.message}`, threadID, messageID);
     }
