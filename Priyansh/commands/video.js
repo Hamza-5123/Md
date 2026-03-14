@@ -6,11 +6,11 @@ const ytSearch = require("yt-search");
 module.exports.config = {
     name: "video",
     aliases: ["ytvideo"],
-    version: "1.7.0",
-    credits: "Priyansh / Gemini",
+    version: "1.8.0",
+    credits: "Shaan Khan",
     hasPermssion: 0,
     commandCategory: "Media",
-    description: "Download video from YouTube with reactions and optimized formatting",
+    description: "Download video for encrypted groups",
     usages: "[video name/URL]",
     cooldowns: 5,
 };
@@ -18,7 +18,7 @@ module.exports.config = {
 module.exports.run = async function ({ api, event, args }) {
     const { threadID, messageID } = event;
 
-    // 🔑 API KEY (Priyanshu API)
+    // 🔑 API KEY
     const PRIYANSHU_API_KEY = "apim_xvY6cZuyLPTyju7BBJJOxynlf8Hp5tR19sXJIdEUZIA"; 
 
     if (!args.length) {
@@ -34,13 +34,12 @@ module.exports.run = async function ({ api, event, args }) {
 
     let processingMsg;
     try {
-        // 1. Initial Reaction (Loading)
+        // Initial Reaction
         api.setMessageReaction("⌛", messageID, (err) => {}, true);
 
-        // Status Message
         processingMsg = await api.sendMessage("✅ Apki Request Jari Hai Please Wait...", threadID);
 
-        // 2. YouTube Search
+        // 1. YouTube Search
         const searchResult = await ytSearch(input);
         if (!searchResult || !searchResult.videos.length) {
             api.setMessageReaction("❌", messageID, (err) => {}, true);
@@ -50,12 +49,12 @@ module.exports.run = async function ({ api, event, args }) {
         const video = searchResult.videos[0];
         const videoUrl = video.url;
 
-        // 3. Calling API for Video Download Link
+        // 2. API Call
         const apiUrl = `https://priyanshuapi.xyz/api/runner/youtube-downloader-v2/download`;
         const response = await axios.post(apiUrl, {
             url: videoUrl,
             format: "mp4",
-            videoQuality: "360" // Standard quality for FB
+            videoQuality: "360"
         }, {
             headers: {
                 'Authorization': `Bearer ${PRIYANSHU_API_KEY}`,
@@ -65,16 +64,12 @@ module.exports.run = async function ({ api, event, args }) {
         });
 
         const data = response.data.data;
-        if (!data || !data.downloadUrl) {
-            throw new Error("Download link not found.");
-        }
+        if (!data || !data.downloadUrl) throw new Error("Download link error.");
 
-        // 4. Formatting Message (Title/Details with Gaps + Your Footer)
+        // 3. Formatting Text (Connected with Video)
         const infoMsg = `🎥 𝗧𝗶𝘁𝗹𝗲: ${video.title}\n\n⏱️ 𝗗𝘂𝗿𝗮𝘁𝗶𝗼𝗻: ${video.timestamp}\n\n👤 𝗖𝗵𝗮𝗻𝗻𝗲𝗹: ${video.author.name}\n\n»»𝑶𝑾𝑵𝑬𝑹««★™ »»𝑺𝑯𝑨𝑨𝑵 𝑲𝑯𝑨𝑵««\n🥀𝒀𝑬 𝑳𝑶 𝑩𝑨𝑩𝒀 𝑨𝑷𝑲𝑰     👉VIDEO`;
-        
-        await api.sendMessage(infoMsg, threadID);
 
-        // 5. Stream Download for Large Videos
+        // 4. Optimized Stream Download
         const writer = fs.createWriteStream(cachePath);
         const streamResponse = await axios({
             url: data.downloadUrl,
@@ -88,24 +83,23 @@ module.exports.run = async function ({ api, event, args }) {
             const stats = fs.statSync(cachePath);
             const fileSizeInMB = stats.size / (1024 * 1024);
 
-            // Messenger limit for video is usually 25MB-40MB depending on bot account
             if (fileSizeInMB > 45) {
                 api.setMessageReaction("❌", messageID, (err) => {}, true);
-                api.sendMessage(`⚠️ Video size (${fileSizeInMB.toFixed(2)}MB) is too large for Messenger.`, threadID, messageID);
-                return fs.unlinkSync(cachePath);
+                if (processingMsg) api.unsendMessage(processingMsg.messageID);
+                return api.sendMessage("⚠️ Video too large.", threadID, messageID);
             }
 
-            // Send Video File
+            // 5. SENDING BOTH TOGETHER (Connected Logic for E2EE)
             api.sendMessage({
+                body: infoMsg, // Title/Footer yahan connect kar diya
                 attachment: fs.createReadStream(cachePath)
             }, threadID, (err) => {
                 if (!err) {
-                    // Final Reaction (Done)
                     api.setMessageReaction("✅", messageID, (err) => {}, true);
                 }
                 if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
                 if (processingMsg) api.unsendMessage(processingMsg.messageID);
-            });
+            }, messageID);
         });
 
         writer.on("error", (err) => { throw err; });
