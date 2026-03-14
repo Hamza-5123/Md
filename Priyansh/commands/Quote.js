@@ -2,7 +2,7 @@ const axios = require("axios");
 
 module.exports = {
   config: {
-    name: "quote_image", // Command ka naam thoda change kiya hai
+    name: "quote", // Command ka naam thoda change kiya hai
     version: "3.0.0",
     role: 0,
     author: "Shaan Khan",
