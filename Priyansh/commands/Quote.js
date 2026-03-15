@@ -2,34 +2,59 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "quote",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 0,
   credits: "Shaan Khan",
-  description: "AI Stylish Quote",
+  description: "AI Stylish Quote using Groq",
   commandCategory: "ai",
-  usages: "",
+  usages: "[topic/vibe]",
   cooldowns: 10
 };
 
-module.exports.run = async function ({ api, event }) {
+module.exports.run = async function ({ api, event, args }) {
   const { threadID, messageID } = event;
+  const userPrompt = args.join(" ") || "inspirational and deep life quote";
 
   api.sendMessage("⌛ 𝑷𝒍𝒆𝒂𝒔𝒆 𝒘𝒂𝒊𝒕 𝑺𝒉𝒂𝒂𝒏 𝑲𝒉𝒂𝒏...", threadID, messageID);
 
   try {
+    // Groq API Integration
+    const groqResponse = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: "You are a poetic quote generator. Provide only the quote text, short and powerful, without quotes or author name."
+          },
+          {
+            role: "user",
+            content: `Generate a stylish and deep quote about: ${userPrompt}`
+          }
+        ]
+      },
+      {
+        headers: {
+          "Authorization": `Bearer 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`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
-    const quoteRes = await axios.get("https://api.quotable.io/random");
-    const quote = quoteRes.data.content;
+    const quote = groqResponse.data.choices[0].message.content;
 
+    // Image Generation using Pollinations
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      quote + " aesthetic cinematic nature 4k"
+      quote + " aesthetic cinematic nature 4k background soft lighting"
     )}`;
 
-    const image = (await axios.get(imageUrl, { responseType: "arraybuffer" })).data;
+    const imageRes = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    const image = imageRes.data;
 
     api.sendMessage(
       {
-        body:
+        body: 
 `╔══════════════════╗
    ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 𝑮𝑬𝑵𝑬𝑹𝑨𝑻𝑶𝑹 ✨
 ╚══════════════════╝
@@ -46,7 +71,7 @@ module.exports.run = async function ({ api, event }) {
     );
 
   } catch (err) {
-    console.log(err);
-    api.sendMessage("❌ 𝑬𝒓𝒓𝒐𝒓 𝒂𝒂 𝒈𝒚𝒂 𝑨𝑷𝑰 𝒎𝒆𝒊𝒏.", threadID, messageID);
+    console.error(err);
+    api.sendMessage("❌ 𝑬𝒓𝒓𝒐𝒓: Groq API connection failed.", threadID, messageID);
   }
 };
