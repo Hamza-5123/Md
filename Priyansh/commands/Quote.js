@@ -1,66 +1,52 @@
 const axios = require("axios");
 
-module.exports = {
-  config: {
-    name: "quote",
-    version: "5.0.0",
-    author: "Shaan Khan",
-    countDown: 10,
-    role: 0, // Sab ke liye
-    shortDescription: "Generates Urdu quote and AI image",
-    longDescription: "AI generates a deep Urdu quote and a matching background image.",
-    category: "ai",
-    guide: "{p}quote",
-    hasPermission: 0, // 0 for everyone
-    usePrefix: true // Prefix ke saath chalega
-  },
+module.exports.config = {
+  name: "quote",
+  version: "1.0.0",
+  hasPermssion: 0,
+  credits: "Shaan Khan",
+  description: "AI Stylish Quote",
+  commandCategory: "ai",
+  usages: "",
+  cooldowns: 10
+};
 
-  onStart: async function ({ api, event }) {
-    const { threadID, messageID } = event;
-    const apiKey = "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";
+module.exports.run = async function ({ api, event }) {
+  const { threadID, messageID } = event;
 
-    // Chhota sa loading message
-    api.sendMessage("⌛ 𝑷𝒍𝒆𝒂𝒔𝒆 𝒘𝒂𝒊𝒕 Shaan Khan...", threadID, messageID);
+  api.sendMessage("⌛ 𝑷𝒍𝒆𝒂𝒔𝒆 𝒘𝒂𝒊𝒕 𝑺𝒉𝒂𝒂𝒏 𝑲𝒉𝒂𝒏...", threadID, messageID);
 
-    try {
-      // 1. Groq AI se quote lena
-      const res = await axios.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          model: "llama3-8b-8192",
-          messages: [
-            {
-              role: "system",
-              content: "Create a short, poetic, and deep life quote in Urdu script. No English or Roman Urdu."
-            }
-          ]
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
+  try {
 
-      const quote = res.data.choices[0].message.content;
+    const quoteRes = await axios.get("https://api.quotable.io/random");
+    const quote = quoteRes.data.content;
 
-      // 2. Pollinations AI Image
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(quote + " aesthetic cinematic scenery, 4k, realistic")}?width=1080&height=1080&nologo=true`;
-      
-      const imageStream = (await axios.get(imageUrl, { responseType: 'stream' })).data;
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      quote + " aesthetic cinematic nature 4k"
+    )}`;
 
-      // 3. Final Response
-      const msg = {
-        body: `╔══════════════════╗\n  ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 & 𝑰𝑴𝑨𝑮𝑬 ✨  \n╚══════════════════╝\n\n📝 ${quote}\n\n👤 𝑶𝒘𝒏𝒆𝒓: 𝐒𝐡𝐚𝐚𝐧 𝐊𝐡𝐚𝐧`,
-        attachment: imageStream
-      };
+    const image = (await axios.get(imageUrl, { responseType: "arraybuffer" })).data;
 
-      return api.sendMessage(msg, threadID, messageID);
+    api.sendMessage(
+      {
+        body:
+`╔══════════════════╗
+   ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 𝑮𝑬𝑵𝑬𝑹𝑨𝑻𝑶𝑹 ✨
+╚══════════════════╝
 
-    } catch (e) {
-      console.log(e);
-      return api.sendMessage("❌ Kuch masla aa raha hai, please check API key or network.", threadID, messageID);
-    }
+📝 ${quote}
+
+╭───────────────╮
+👑 𝑶𝒘𝒏𝒆𝒓: 𝐒𝐡𝐚𝐚𝐧 𝐊𝐡𝐚𝐧
+╰───────────────╯`,
+        attachment: Buffer.from(image)
+      },
+      threadID,
+      messageID
+    );
+
+  } catch (err) {
+    console.log(err);
+    api.sendMessage("❌ 𝑬𝒓𝒓𝒐𝒓 𝒂𝒂 𝒈𝒚𝒂 𝑨𝑷𝑰 𝒎𝒆𝒊𝒏.", threadID, messageID);
   }
 };
