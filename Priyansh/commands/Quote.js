@@ -2,10 +2,10 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "quote",
-  version: "2.1.0",
+  version: "2.2.0",
   hasPermssion: 0,
   credits: "Shaan Khan",
-  description: "AI Stylish Quote using Groq API",
+  description: "AI Stylish Quote using Updated Groq Model",
   commandCategory: "ai",
   usages: "[topic]",
   cooldowns: 10
@@ -18,19 +18,15 @@ module.exports.run = async function ({ api, event, args }) {
   api.sendMessage("⌛ 𝑷𝒍𝒆𝒂𝒔𝒆 𝒘𝒂𝒊𝒕 𝑺𝒉𝒂𝒂𝒏 𝑲𝒉𝒂𝒏...", threadID, messageID);
 
   try {
-    const groqResponse = await axios({
-      method: 'post',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      headers: {
-        'Authorization': `Bearer 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`,
-        'Content-Type': 'application/json'
-      },
-      data: {
-        model: "llama3-70b-8192", // Stable model version
+    const groqResponse = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        // Naya supported model yahan update kar diya hai
+        model: "llama-3.3-70b-versatile", 
         messages: [
           {
             role: "system",
-            content: "Generate one short, aesthetic quote. Only return the quote text."
+            content: "Generate one short, aesthetic quote. Only return the quote text without any extra words."
           },
           {
             role: "user",
@@ -38,14 +34,20 @@ module.exports.run = async function ({ api, event, args }) {
           }
         ],
         temperature: 0.7
+      },
+      {
+        headers: {
+          "Authorization": `Bearer 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`,
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
 
     const quote = groqResponse.data.choices[0].message.content;
 
-    // Pollinations for image
+    // Image Generation (Pollinations)
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      quote + " aesthetic cinematic nature 4k wallpaper"
+      quote + " aesthetic cinematic nature 4k background"
     )}?width=1024&height=1024&nologo=true`;
 
     const imageRes = await axios.get(imageUrl, { responseType: "arraybuffer" });
@@ -69,9 +71,7 @@ module.exports.run = async function ({ api, event, args }) {
     );
 
   } catch (err) {
-    // Ye terminal mein check karein ke error kya hai
-    console.error("GROQ ERROR DETAILS:", err.response ? err.response.data : err.message);
-    
-    api.sendMessage(`❌ 𝑬𝒓𝒓𝒐𝒓: ${err.response?.data?.error?.message || "API Connection Issue"}`, threadID, messageID);
+    console.error("GROQ ERROR:", err.response ? err.response.data : err.message);
+    api.sendMessage(`❌ 𝑬𝒓𝒓𝒐𝒓: ${err.response?.data?.error?.message || "Model Issue"}`, threadID, messageID);
   }
 };
