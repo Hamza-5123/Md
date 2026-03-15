@@ -21,7 +21,6 @@ module.exports.run = async function ({ api, event, args }) {
     const groqResponse = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        // Naya supported model yahan update kar diya hai
         model: "llama-3.3-70b-versatile", 
         messages: [
           {
@@ -50,20 +49,16 @@ module.exports.run = async function ({ api, event, args }) {
       quote + " aesthetic cinematic nature 4k background"
     )}?width=1024&height=1024&nologo=true`;
 
-    const imageRes = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    const imageRes = await axios.get(imageUrl, { 
+      responseType: "arraybuffer",
+      timeout: 20000 // 20 seconds timeout for image
+    });
 
-    api.sendMessage(
+    const bodyText = `╔══════════════════╗\n   ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 𝑮𝑬𝑵𝑬𝑹𝑨𝑻𝑶𝑹 ✨\n╚══════════════════╝\n\n📝 ${quote}\n\n╭───────────────╮\n👑 𝑶𝒘𝒏𝒆𝒓: 𝐒𝐡𝐚𝐚𝐧 𝐊𝐡𝐚𝐧\n╰───────────────╯`;
+
+    return api.sendMessage(
       {
-        body: 
-`╔══════════════════╗
-   ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 𝑮𝑬𝑵𝑬𝑹𝑨𝑻𝑶𝑹 ✨
-╚══════════════════╝
-
-📝 ${quote}
-
-╭───────────────╮
-👑 𝑶𝒘𝒏𝒆𝒓: 𝐒𝐡𝐚𝐚𝐧 𝐊𝐡𝐚𝐧
-╰───────────────╯`,
+        body: bodyText,
         attachment: Buffer.from(imageRes.data)
       },
       threadID,
@@ -71,7 +66,8 @@ module.exports.run = async function ({ api, event, args }) {
     );
 
   } catch (err) {
-    console.error("GROQ ERROR:", err.response ? err.response.data : err.message);
-    api.sendMessage(`❌ 𝑬𝒓𝒓𝒐𝒓: ${err.response?.data?.error?.message || "Model Issue"}`, threadID, messageID);
+    const errMsg = err.response?.data?.error?.message || err.message;
+    console.error("GROQ/IMAGE ERROR:", errMsg);
+    return api.sendMessage(`❌ 𝑬𝒓𝒓𝒐𝒓: ${errMsg}`, threadID, messageID);
   }
 };
