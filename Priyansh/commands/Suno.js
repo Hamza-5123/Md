@@ -4,10 +4,10 @@ const path = require('path');
 
 module.exports.config = {
   name: "suno",
-  version: "4.0.0",
+  version: "5.1.0",
   hasPermssion: 0,
   credits: "Shaan",
-  description: "Official Style Interactive Suno AI Generator",
+  description: "Interactive AI Audio Generator (Fixed Gender Voice)",
   commandCategory: "AI Music",
   usages: "suno",
   cooldowns: 10
@@ -25,7 +25,7 @@ module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, senderID } = event;
 
   return api.sendMessage(
-    "📝 **Step 1:** Apne gaane ke **Custom Lyrics** yahan type karein:",
+    "📝 **Step 1:** Apne gaane ke **Custom Lyrics** likhein:",
     threadID,
     (err, info) => {
       global.client.handleReply.push({
@@ -43,21 +43,21 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
   const { threadID, messageID, senderID, body } = event;
   if (handleReply.author !== senderID) return;
 
-  const step = handleReply.step;
+  const cachePath = path.join(__dirname, "cache");
+  if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath);
 
   try {
-    // --- STEP 1: Lyrics Receive Karo aur Gender Pucho ---
-    if (step === 1) {
-      const lyrics = body;
+    // --- STEP 1: Lyrics milne par Gender puchna ---
+    if (handleReply.step === 1) {
       return api.sendMessage(
-        "🎙️ **Step 2:** Voice choose karein:\n\n1. Male 👨\n2. Female 👩",
+        "🎙️ **Step 2:** Voice choose karein:\n\n1. Male (Mardana Awaaz) 👨\n2. Female (Zanana Awaaz) 👩",
         threadID,
         (err, info) => {
           global.client.handleReply.push({
             step: 2,
             name: this.config.name,
             author: senderID,
-            lyrics: lyrics,
+            lyrics: body,
             messageID: info.messageID
           });
         },
@@ -65,11 +65,22 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
       );
     }
 
-    // --- STEP 2: Gender Receive Karo aur Style Pucho ---
-    if (step === 2) {
-      const gender = (body == "1" || body.toLowerCase() === "male") ? "Male" : "Female";
+    // --- STEP 2: Gender fix karne ka naya logic ---
+    if (handleReply.step === 2) {
+      // Is logic se AI ko clear instruction jayegi
+      let genderTag = "";
+      let genderDisplay = "";
+      
+      if (body == "2" || body.toLowerCase().includes("female")) {
+        genderTag = "Female Vocalist, Woman's Voice, Clear Female Vocals"; // Strong tags for Female
+        genderDisplay = "Female 👩";
+      } else {
+        genderTag = "Male Vocalist, Man's Voice, Masculine Vocals"; // Strong tags for Male
+        genderDisplay = "Male 👨";
+      }
+
       return api.sendMessage(
-        "🎸 **Step 3:** Music ka **Style** select karein:\n\n- Classic\n- Hip Hop\n- Pop\n- Rock\n- Lo-fi",
+        `✅ Voice set to: ${genderDisplay}\n\n🎸 **Step 3:** Music ka **Style** batayein? (Classic, Hip Hop, Pop, Rock, etc.)`,
         threadID,
         (err, info) => {
           global.client.handleReply.push({
@@ -77,7 +88,8 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
             name: this.config.name,
             author: senderID,
             lyrics: handleReply.lyrics,
-            gender: gender,
+            genderTag: genderTag,
+            genderDisplay: genderDisplay,
             messageID: info.messageID
           });
         },
@@ -85,11 +97,10 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
       );
     }
 
-    // --- STEP 3: Style Receive Karo aur Title Pucho ---
-    if (step === 3) {
-      const style = body;
+    // --- STEP 3: Style receive karna ---
+    if (handleReply.step === 3) {
       return api.sendMessage(
-        "🏷️ **Step 4:** Apne Song ka **Title (Naam)** kya rakhna chahte hain?",
+        "🏷️ **Step 4:** Apne Song ka **Title (Naam)** kya rakhna hai?",
         threadID,
         (err, info) => {
           global.client.handleReply.push({
@@ -97,8 +108,9 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
             name: this.config.name,
             author: senderID,
             lyrics: handleReply.lyrics,
-            gender: handleReply.gender,
-            style: style,
+            genderTag: handleReply.genderTag,
+            genderDisplay: handleReply.genderDisplay,
+            style: body,
             messageID: info.messageID
           });
         },
@@ -106,16 +118,18 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
       );
     }
 
-    // --- STEP 4: Title Receive Karo aur Song Generate Karo ---
-    if (step === 4) {
+    // --- STEP 4: Audio Generation with Forced Gender Tags ---
+    if (handleReply.step === 4) {
       const title = body;
-      const { lyrics, gender, style } = handleReply;
-      const fullStyle = `${gender} voice, ${style} style`;
+      const { lyrics, genderTag, style, genderDisplay } = handleReply;
+      
+      // Yahan hum Style aur Gender ko merge kar rahe hain taake AI ignore na kar sake
+      const finalStylePrompt = `${style}, ${genderTag}`;
 
-      api.sendMessage(`⏳ Processing...\n\n🎵 Title: ${title}\n🎤 Voice: ${gender}\n🎸 Style: ${style}\n\nGaana taiyar ho raha hai, thoda intezar karein...`, threadID, messageID);
+      api.sendMessage(`⏳ Processing Masterpiece...\n\n🎵 Title: ${title}\n🎙️ Voice: ${genderDisplay}\n🎸 Style: ${style}\n\nAI abhi aapka gaana bana raha hai...`, threadID, messageID);
 
       const apiKey = API_KEYS[Math.floor(Math.random() * API_KEYS.length)];
-      const createUrl = `${BASE_URL}?apikey=${apiKey}&action=create&prompt=${encodeURIComponent(lyrics)}&style=${encodeURIComponent(fullStyle)}&title=${encodeURIComponent(title)}`;
+      const createUrl = `${BASE_URL}?apikey=${apiKey}&action=create&prompt=${encodeURIComponent(lyrics)}&style=${encodeURIComponent(finalStylePrompt)}&title=${encodeURIComponent(title)}`;
       
       const createRes = await axios.get(createUrl);
       if (!createRes.data.status) throw new Error("API Limit reached!");
@@ -123,7 +137,6 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
       const taskId = createRes.data.task_id;
       let audioUrl = null;
 
-      // Polling for Status
       for (let i = 0; i < 15; i++) {
         await new Promise(r => setTimeout(r, 10000));
         const statusRes = await axios.get(`${BASE_URL}?apikey=${apiKey}&action=status&task_id=${taskId}`);
@@ -135,14 +148,14 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
         }
       }
 
-      if (!audioUrl) return api.sendMessage("❌ Error: Gaana banane mein zyada waqt lag raha hai. Dubara try karein.", threadID, messageID);
+      if (!audioUrl) return api.sendMessage("❌ Timeout error! Dubara try karein.", threadID, messageID);
 
-      const filePath = path.join(__dirname, "cache", `suno_${Date.now()}.mp3`);
+      const filePath = path.join(cachePath, `suno_${Date.now()}.mp3`);
       const response = await axios({ method: 'get', url: audioUrl, responseType: 'arraybuffer' });
       await fs.writeFile(filePath, Buffer.from(response.data));
 
       return api.sendMessage({
-        body: `✅ **Song Generated!**\n\n🎼 Title: ${title}\n🎭 Genre: ${style}\n🎙️ Vocal: ${gender}`,
+        body: `🎶 **Suno AI Audio Generated**\n\n🎼 Title: ${title}\n🎭 Genre: ${style}\n🎙️ Vocal: ${genderDisplay}`,
         attachment: fs.createReadStream(filePath)
       }, threadID, () => fs.unlinkSync(filePath), messageID);
     }
