@@ -3,22 +3,27 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "quote",
-    version: "3.0.0",
-    role: 0,
+    version: "5.0.0",
     author: "Shaan Khan",
-    description: "Generates a fresh stylish quote and matching AI image",
+    countDown: 10,
+    role: 0, // Sab ke liye
+    shortDescription: "Generates Urdu quote and AI image",
+    longDescription: "AI generates a deep Urdu quote and a matching background image.",
     category: "ai",
-    guide: "{p}quote"
+    guide: "{p}quote",
+    hasPermission: 0, // 0 for everyone
+    usePrefix: true // Prefix ke saath chalega
   },
 
   onStart: async function ({ api, event }) {
     const { threadID, messageID } = event;
     const apiKey = "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";
 
-    api.sendMessage("⏳ 𝑷𝒍𝒆𝒂𝒔𝒆 𝒘𝒂𝒊𝒕... 𝑮𝒆𝒏𝒆𝒓𝒂𝒕𝒊𝒏𝒈 𝑸𝒖𝒐𝒕𝒆 & 𝑰𝒎𝒂𝒈𝒆...", threadID, messageID);
+    // Chhota sa loading message
+    api.sendMessage("⌛ 𝑷𝒍𝒆𝒂𝒔𝒆 𝒘𝒂𝒊𝒕 Shaan Khan...", threadID, messageID);
 
     try {
-      // Step 1: Groq AI se Urdu Quote
+      // 1. Groq AI se quote lena
       const res = await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
         {
@@ -26,7 +31,7 @@ module.exports = {
           messages: [
             {
               role: "system",
-              content: "Generate a short, deep, and emotional life quote in Urdu script. No English, no Roman. Just the quote."
+              content: "Create a short, poetic, and deep life quote in Urdu script. No English or Roman Urdu."
             }
           ]
         },
@@ -40,24 +45,22 @@ module.exports = {
 
       const quote = res.data.choices[0].message.content;
 
-      // Step 2: Image Prompt
-      const imagePrompt = `Cinematic background, poetic atmosphere, high resolution, related to: ${quote}`;
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1080&height=1080&nologo=true`;
-
-      const message = `╔══════════════════╗\n` +
-                      `  ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 & 𝑰𝑴𝑨𝑮𝑬 ✨  \n` +
-                      `╚══════════════════╝\n\n` +
-                      `📝 ${quote}\n\n` +
-                      `👤 𝑶𝒘𝒏𝒆𝒓: 𝐒𝐡𝐚𝐚𝐧 𝐊𝐡𝐚𝐧`;
-
-      // Step 3: Get Image Stream
-      const response = await axios.get(imageUrl, { responseType: 'stream' });
+      // 2. Pollinations AI Image
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(quote + " aesthetic cinematic scenery, 4k, realistic")}?width=1080&height=1080&nologo=true`;
       
-      return api.sendMessage({ body: message, attachment: response.data }, threadID, messageID);
+      const imageStream = (await axios.get(imageUrl, { responseType: 'stream' })).data;
 
-    } catch (error) {
-      console.error(error);
-      return api.sendMessage("❌ Error: API Key check karein ya network ka masla hai.", threadID, messageID);
+      // 3. Final Response
+      const msg = {
+        body: `╔══════════════════╗\n  ✨ 𝑨𝑰 𝑸𝑼𝑶𝑻𝑬 & 𝑰𝑴𝑨𝑮𝑬 ✨  \n╚══════════════════╝\n\n📝 ${quote}\n\n👤 𝑶𝒘𝒏𝒆𝒓: 𝐒𝐡𝐚𝐚𝐧 𝐊𝐡𝐚𝐧`,
+        attachment: imageStream
+      };
+
+      return api.sendMessage(msg, threadID, messageID);
+
+    } catch (e) {
+      console.log(e);
+      return api.sendMessage("❌ Kuch masla aa raha hai, please check API key or network.", threadID, messageID);
     }
   }
 };
