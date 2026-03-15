@@ -36,7 +36,7 @@ module.exports.run = async function ({ api, event, args }) {
       },
       {
         headers: {
-          "Authorization": `Bearer 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`,
+          "Authorization": `Bearer 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`,
           "Content-Type": "application/json"
         }
       }
