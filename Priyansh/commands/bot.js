@@ -188,7 +188,7 @@ module.exports.handleEvent = async function({ api, event, args, Threads, Users }
    };
 
    if ((event.body.toLowerCase() == "🥰") || (event.body.toLowerCase() == "😍") || (event.body.toLowerCase() == "😻") || (event.body.toLowerCase() == "❤️")) {
-     return api.sendMessage("🦋🌿𝐁𝐑𝐀𝐍𝐃𝐄𝐃 𝐊𝐔𝐑𝐈𝐈 𝐌𝐄𝐑𝐀 🌬️🌍 ••𝐃𝐈𝐋 𝐊𝐈 𝐐𝐔𝐄𝐄𝐍 𝐇𝐈𝐈>³••🕊️🍎😍", threadID);
+     return api.sendMessage("🦋🌿𝐁𝐑𝐀𝐍𝐃𝐄𝐃 𝐊𝐔𝐑𝐈𝐈 𝐃𝐈𝐋𝐋 🌬️🌍𝐊𝐈 𝐁𝐇𝐔𝐓 𝐂𝐔𝐓𝐄 𝐇𝐈𝐈 ••>³••🕊️🍎😍", threadID);
    };
 
    if ((event.body.toLowerCase() == "kese ho") || (event.body.toLowerCase() == "kaise ho") || (event.body.toLowerCase() == "kese ho ji") || (event.body.toLowerCase() == "how are you") || (event.body.toLowerCase() == "how are you?")) {
